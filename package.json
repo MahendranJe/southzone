@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
     "db:generate": "prisma generate",
@@ -25,7 +25,7 @@
     "@mantine/notifications": "^8.3.18",
     "@mantine/nprogress": "^8.3.18",
     "@prisma/adapter-pg": "^7.7.0",
-    "@prisma/client": "^7.5.0",
+    "@prisma/client": "^7.7.0",
     "@tabler/icons-react": "^3.41.0",
     "bcryptjs": "^3.0.3",
     "dayjs": "^1.11.20",
@@ -33,7 +33,7 @@
     "next-auth": "^5.0.0-beta.30",
     "pg": "^8.20.0",
     "postcss-preset-mantine": "^1.18.0",
-    "prisma": "^7.5.0",
+    "prisma": "^7.7.0",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
