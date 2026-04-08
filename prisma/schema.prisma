@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlserver"
+  provider = "postgresql"
 }
 
 model User {
@@ -38,15 +38,15 @@ model Train {
   title              String
   fromStation        String
   toStation          String
-  description        String    @db.NVarChar(Max)
-  timeTableJson      String?   @db.NVarChar(Max)
+  description        String    @db.Text
+  timeTableJson      String?   @db.Text
   scheduleType       String
   scheduleDays       String?
   startDate          DateTime?
   endDate            DateTime?
   isPremium          Boolean   @default(false)
   isActive           Boolean   @default(true)
-  imageUrl           String?   @db.NVarChar(Max)
+  imageUrl           String?   @db.Text
   scheduleBadgeText  String?
   scheduleBadgeColor String?
   nextRunDate        String?
@@ -80,7 +80,7 @@ model Notification {
   id        Int      @id @default(autoincrement())
   userId    Int
   title     String
-  message   String   @db.NVarChar(Max)
+  message   String   @db.Text
   type      String   @default("INFO")
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -98,7 +98,7 @@ model Payment {
   utrNumber     String
   status        String   @default("PENDING")
   screenshotUrl String?
-  notes         String?  @db.NVarChar(Max)
+  notes         String?  @db.Text
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

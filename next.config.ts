@@ -3,8 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   serverExternalPackages: [
     "@prisma/client",
-    "@prisma/adapter-mssql",
-    "tedious",
+    "@prisma/adapter-pg",
+    "pg",
     "prisma",
   ],
   images: {

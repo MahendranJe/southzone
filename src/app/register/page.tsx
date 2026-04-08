@@ -23,28 +23,7 @@ import { notifications } from "@mantine/notifications";
 import { IconMail, IconPhone, IconTrain, IconUser } from "@tabler/icons-react";
 import Link from "next/link";
 import { useState } from "react";
-
-const stateList = [
-  "Tamil Nadu",
-  "Karnataka",
-  "Kerala",
-  "Andhra Pradesh",
-  "Telangana",
-  "Maharashtra",
-  "Delhi",
-  "West Bengal",
-];
-
-const cityMap: Record<string, string[]> = {
-  "Tamil Nadu": ["Chennai", "Coimbatore", "Madurai", "Salem", "Trichy"],
-  Karnataka: ["Bangalore", "Mysore", "Mangalore", "Hubli", "Belgaum"],
-  Kerala: ["Thiruvananthapuram", "Kochi", "Kozhikode", "Thrissur"],
-  "Andhra Pradesh": ["Visakhapatnam", "Vijayawada", "Guntur", "Tirupati"],
-  Telangana: ["Hyderabad", "Warangal", "Karimnagar"],
-  Maharashtra: ["Mumbai", "Pune", "Nagpur", "Nashik"],
-  Delhi: ["New Delhi", "Dwarka", "Noida"],
-  "West Bengal": ["Kolkata", "Howrah", "Siliguri"],
-};
+import { getDistrictsByState, INDIA_STATES } from "@/lib/indiaLocations";
 
 export default function RegisterPage() {
   const [active, setActive] = useState(0);
@@ -68,7 +47,7 @@ export default function RegisterPage() {
           fullName: values.fullName.trim().length < 2 ? "Full name is required" : null,
           gender: !values.gender ? "Select gender" : null,
           state: !values.state ? "Select state" : null,
-          city: !values.city ? "Select city" : null,
+          city: !values.city ? "Select district" : null,
         };
       }
       if (active === 1) {
@@ -129,7 +108,7 @@ export default function RegisterPage() {
     }
   };
 
-  const cities = cityMap[form.values.state] ?? [];
+  const districts = getDistrictsByState(form.values.state);
 
   return (
     <Box
@@ -200,7 +179,7 @@ export default function RegisterPage() {
                 <Select
                   label="State"
                   placeholder="Select state"
-                  data={stateList}
+                  data={INDIA_STATES}
                   searchable
                   {...form.getInputProps("state")}
                   onChange={(v) => {
@@ -211,9 +190,9 @@ export default function RegisterPage() {
               </Grid.Col>
               <Grid.Col span={6}>
                 <Select
-                  label="City"
-                  placeholder="Select city"
-                  data={cities}
+                  label="District"
+                  placeholder="Select district"
+                  data={districts}
                   searchable
                   disabled={!form.values.state}
                   {...form.getInputProps("city")}
