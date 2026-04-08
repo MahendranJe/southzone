@@ -1,7 +1,16 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  serverExternalPackages: [
+    "@prisma/client",
+    "@prisma/adapter-mssql",
+    "tedious",
+    "prisma",
+  ],
+  images: {
+    // Allow unoptimized local images for development
+    unoptimized: true,
+  },
 };
 
 export default nextConfig;

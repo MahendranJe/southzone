@@ -1,0 +1,109 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+}
+
+model User {
+  id            Int            @id @default(autoincrement())
+  fullName      String
+  email         String         @unique
+  username      String         @unique
+  password      String
+  phone         String?
+  gender        String?
+  state         String?
+  city          String?
+  role          String         @default("USER")
+  plan          String         @default("FREE")
+  planExpiry    DateTime?
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  alerts        Alert[]
+  notifications Notification[]
+  payments      Payment[]
+
+  @@index([email])
+  @@index([username])
+  @@index([role])
+}
+
+model Train {
+  id                 Int       @id @default(autoincrement())
+  trainNumber        String    @unique
+  title              String
+  fromStation        String
+  toStation          String
+  description        String    @db.NVarChar(Max)
+  timeTableJson      String?   @db.NVarChar(Max)
+  scheduleType       String
+  scheduleDays       String?
+  startDate          DateTime?
+  endDate            DateTime?
+  isPremium          Boolean   @default(false)
+  isActive           Boolean   @default(true)
+  imageUrl           String?   @db.NVarChar(Max)
+  scheduleBadgeText  String?
+  scheduleBadgeColor String?
+  nextRunDate        String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  alerts Alert[]
+
+  @@index([isActive])
+  @@index([trainNumber])
+}
+
+model Alert {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  trainId     Int
+  trainNumber String
+  trainName   String
+  travelDate  DateTime?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  train Train @relation(fields: [trainId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isActive])
+  @@index([trainId])
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  title     String
+  message   String   @db.NVarChar(Max)
+  type      String   @default("INFO")
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+}
+
+model Payment {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  plan          String
+  amount        Int
+  utrNumber     String
+  status        String   @default("PENDING")
+  screenshotUrl String?
+  notes         String?  @db.NVarChar(Max)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
