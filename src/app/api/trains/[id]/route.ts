@@ -3,6 +3,8 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import "@/types/next-auth";
 
+export const runtime = "nodejs";
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
