@@ -5,8 +5,10 @@ import { Pool } from "pg";
 import { hash } from "bcryptjs";
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL!,
-  ssl: { rejectUnauthorized: false },
+    connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  },
 });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
