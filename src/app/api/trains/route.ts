@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
 import "@/types/next-auth";
 
 export async function GET(request: NextRequest) {
@@ -128,7 +127,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ train }, { status: 201 });
   } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+    if (err instanceof Error && "code" in err && (err as { code: string }).code === "P2002") {
       return NextResponse.json(
         { error: "Train number already exists. Please use a unique train number." },
         { status: 409 }
