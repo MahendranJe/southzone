@@ -36,7 +36,9 @@ const authConfig: NextAuthConfig = {
   },
 };
 
-export const { auth: middleware } = NextAuth(authConfig);
+const { auth } = NextAuth(authConfig);
+
+export default auth;
 
 export const config = {
   matcher: ["/admin/:path*", "/alerts/:path*", "/notifications/:path*"],
