@@ -72,11 +72,11 @@ export function TrainCard({ train }: TrainCardProps) {
         {/* Route */}
         <Group gap="xs" wrap="nowrap">
           <IconMapPin size={14} className="text-gray-400 shrink-0" />
-          <Text size="xs" c="dimmed" lineClamp={1}>
+          <Text size="xs" fw={700} c="dark" lineClamp={1}>
             {train.fromStation}
           </Text>
           <IconArrowRight size={12} className="text-gray-300 shrink-0" />
-          <Text size="xs" c="dimmed" lineClamp={1}>
+          <Text size="xs" fw={700} c="dark" lineClamp={1}>
             {train.toStation}
           </Text>
         </Group>

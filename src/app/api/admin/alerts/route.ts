@@ -13,6 +13,7 @@ export async function GET() {
   }
 
   const alerts = await prisma.alert.findMany({
+    where: { isActive: true },
     orderBy: { createdAt: "desc" },
   });
 

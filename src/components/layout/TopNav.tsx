@@ -9,6 +9,7 @@ import {
   Container,
   Drawer,
   Group,
+  Indicator,
   Menu,
   Stack,
   Text,
@@ -28,6 +29,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
+import { useEffect, useState } from "react";
 
 const navLinks = [
   { label: "Home", href: "/" },
@@ -41,6 +43,15 @@ export function TopNav({ isAdmin = false }: { isAdmin?: boolean }) {
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
   const pathname = usePathname();
   const { data: session } = useSession();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!session?.user) return;
+    fetch("/api/notifications")
+      .then((r) => r.json())
+      .then((d) => setUnreadCount(d.unread ?? 0))
+      .catch(() => {});
+  }, [session]);
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -80,19 +91,30 @@ export function TopNav({ isAdmin = false }: { isAdmin?: boolean }) {
 
           {/* Desktop nav */}
           <Group gap="xs" visibleFrom="md">
-            {navLinks.map((link) => (
-              <Button
-                key={link.href}
-                component={Link}
-                href={link.href}
-                variant={isActive(link.href) ? "white" : "subtle"}
-                color={isActive(link.href) ? "railwayPurple" : "white"}
-                size="sm"
-                radius="md"
-              >
-                {link.label}
-              </Button>
-            ))}
+            {navLinks.map((link) => {
+              const isNotifications = link.href === "/notifications";
+              const btn = (
+                <Button
+                  key={link.href}
+                  component={Link}
+                  href={link.href}
+                  variant={isActive(link.href) ? "white" : "subtle"}
+                  color={isActive(link.href) ? "railwayPurple" : "white"}
+                  size="sm"
+                  radius="md"
+                >
+                  {link.label}
+                </Button>
+              );
+              if (isNotifications && unreadCount > 0) {
+                return (
+                  <Indicator key={link.href} label={unreadCount > 99 ? "99+" : unreadCount} size={18} color="red" offset={4}>
+                    {btn}
+                  </Indicator>
+                );
+              }
+              return btn;
+            })}
             {isAdminUser && (
               <Button
                 component={Link}
@@ -220,21 +242,32 @@ export function TopNav({ isAdmin = false }: { isAdmin?: boolean }) {
         size="xs"
       >
         <Stack gap="xs" mt="md">
-          {navLinks.map((link) => (
-            <Button
-              key={link.href}
-              component={Link}
-              href={link.href}
-              variant={isActive(link.href) ? "filled" : "subtle"}
-              color="railwayPurple"
-              radius="md"
-              fullWidth
-              justify="flex-start"
-              onClick={close}
-            >
-              {link.label}
-            </Button>
-          ))}
+          {navLinks.map((link) => {
+            const isNotifications = link.href === "/notifications";
+            const btn = (
+              <Button
+                key={link.href}
+                component={Link}
+                href={link.href}
+                variant={isActive(link.href) ? "filled" : "subtle"}
+                color="railwayPurple"
+                radius="md"
+                fullWidth
+                justify="flex-start"
+                onClick={close}
+              >
+                {link.label}
+              </Button>
+            );
+            if (isNotifications && unreadCount > 0) {
+              return (
+                <Indicator key={link.href} label={unreadCount > 99 ? "99+" : unreadCount} size={18} color="red" offset={4} position="top-end">
+                  {btn}
+                </Indicator>
+              );
+            }
+            return btn;
+          })}
           {isAdminUser && (
             <Button
               component={Link}
