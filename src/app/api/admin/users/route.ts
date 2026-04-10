@@ -70,3 +70,30 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "ADMIN") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const idParam = searchParams.get("id");
+    const id = idParam ? Number(idParam) : NaN;
+
+    if (!Number.isFinite(id)) {
+      return NextResponse.json({ error: "Valid id is required" }, { status: 400 });
+    }
+
+    const currentUserId = Number(session.user.id);
+    if (Number.isFinite(currentUserId) && currentUserId === id) {
+      return NextResponse.json({ error: "You cannot delete your own admin account" }, { status: 400 });
+    }
+
+    await prisma.user.delete({ where: { id } });
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}

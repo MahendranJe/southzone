@@ -17,14 +17,21 @@ async function main() {
   console.log("🚂 Seeding Southzone Railway database...\n");
 
   // ── Users ──────────────────────────────────────────────
-  const adminPassword = await hash("admin123", 12);
+  const adminUsername = "MahiJeya@18";
+  const adminRawPassword = "Mahi@Jeya@123";
+  const adminPassword = await hash(adminRawPassword, 12);
   const admin = await prisma.user.upsert({
     where: { email: "admin@southzone.in" },
-    update: {},
+    update: {
+      username: adminUsername,
+      password: adminPassword,
+      role: "ADMIN",
+      isActive: true,
+    },
     create: {
       fullName: "Vignesh Kumar",
       email: "admin@southzone.in",
-      username: "admin",
+      username: adminUsername,
       password: adminPassword,
       phone: "9999999999",
       gender: "Male",
@@ -34,7 +41,7 @@ async function main() {
       plan: "FREE",
     },
   });
-  console.log("✅ Admin created:", admin.email, "(password: admin123)");
+  console.log("✅ Admin created/updated:", admin.email, `(username: ${adminUsername}, password: ${adminRawPassword})`);
 
   const userPassword = await hash("user123", 12);
   const demoUsers = [
@@ -307,7 +314,7 @@ async function main() {
 
   console.log("\n🎉 Seeding complete!");
   console.log("──────────────────────────────");
-  console.log("Admin login: admin / admin123");
+  console.log(`Admin login: ${adminUsername} / ${adminRawPassword}`);
   console.log("User login:  rila / user123  (or arjun, priya, karthik, deepa)");
   console.log("──────────────────────────────");
 }

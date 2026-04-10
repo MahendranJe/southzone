@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import {
+  ActionIcon,
   Avatar,
   Badge,
   Box,
@@ -13,7 +14,7 @@ import {
   Text,
   Title,
 } from "@mantine/core";
-import { IconUsers } from "@tabler/icons-react";
+import { IconTrash, IconUsers } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 
 interface UserRecord {
@@ -43,6 +44,7 @@ const roleColor: Record<string, string> = {
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/api/admin/users")
@@ -50,6 +52,26 @@ export default function AdminUsersPage() {
       .then((d) => setUsers(d.users ?? []))
       .finally(() => setLoading(false));
   }, []);
+
+  const deleteUser = async (user: UserRecord) => {
+    const ok = window.confirm(`Delete user ${user.fullName}? This cannot be undone.`);
+    if (!ok) return;
+
+    try {
+      setDeletingId(user.id);
+      const res = await fetch(`/api/admin/users?id=${user.id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        window.alert(data?.error ?? "Failed to delete user");
+        return;
+      }
+
+      setUsers((prev) => prev.filter((u) => u.id !== user.id));
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <Stack gap="xl">
@@ -75,6 +97,7 @@ export default function AdminUsersPage() {
                 <Table.Th>Plan</Table.Th>
                 <Table.Th>Status</Table.Th>
                 <Table.Th>Joined</Table.Th>
+                <Table.Th>Action</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -109,6 +132,21 @@ export default function AdminUsersPage() {
                     <Text size="xs" c="dimmed">
                       {new Date(u.createdAt).toLocaleDateString("en-IN")}
                     </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    {u.role === "ADMIN" ? (
+                      <Text size="xs" c="dimmed">Protected</Text>
+                    ) : (
+                      <ActionIcon
+                        color="red"
+                        variant="light"
+                        aria-label={`Delete ${u.fullName}`}
+                        onClick={() => deleteUser(u)}
+                        loading={deletingId === u.id}
+                      >
+                        <IconTrash size={14} />
+                      </ActionIcon>
+                    )}
                   </Table.Td>
                 </Table.Tr>
               ))}
