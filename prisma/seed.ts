@@ -4,6 +4,9 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import { hash } from "bcryptjs";
 
+// Aiven uses a self-signed certificate chain for some local connections.
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
   ssl: {
@@ -29,7 +32,7 @@ async function main() {
       isActive: true,
     },
     create: {
-      fullName: "Vignesh Kumar",
+      fullName: "SouthZone",
       email: "admin@southzone.in",
       username: adminUsername,
       password: adminPassword,
