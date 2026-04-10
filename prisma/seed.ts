@@ -26,6 +26,7 @@ async function main() {
   const admin = await prisma.user.upsert({
     where: { email: "admin@southzone.in" },
     update: {
+      fullName: "SouthZone",
       username: adminUsername,
       password: adminPassword,
       role: "ADMIN",
@@ -243,38 +244,42 @@ async function main() {
   }
   console.log(`✅ Seeded ${trains.length} trains`);
 
-  // ── Alerts for demo users ──────────────────────────────
-  const seededTrains = await prisma.train.findMany();
-  const trainMap = new Map(seededTrains.map((t) => [t.trainNumber, t]));
-
-  const alertData = [
-    { user: createdUsers[0], trainNo: "12951", date: new Date("2026-04-15") },
-    { user: createdUsers[0], trainNo: "16101", date: new Date("2026-04-20") },
-    { user: createdUsers[1], trainNo: "12627", date: new Date("2026-04-12") },
-    { user: createdUsers[2], trainNo: "22691", date: new Date("2026-04-14") },
-    { user: createdUsers[3], trainNo: "12001", date: new Date("2026-04-18") },
-    { user: createdUsers[4], trainNo: "12633", date: null },
+  // ── Admin Broadcast Alerts ─────────────────────────────
+  const adminAlertData = [
+    {
+      title: "Mumbai Rajdhani — Platform Change",
+      description: "Train 12951 departure platform changed to Platform 5 from April 1st, 2026. Passengers are advised to arrive 30 minutes early. Catering services have also been upgraded.",
+      trainNumber: "12951",
+      trainName: "Mumbai Rajdhani Express",
+    },
+    {
+      title: "Summer Special Booking Now Open",
+      description: "Advance booking is now open for Vande Bharat summer special coaches from April 15th to June 30th 2026. Limited seats available — book early to secure your travel.",
+      trainNumber: null,
+      trainName: null,
+    },
+    {
+      title: "Chennai Mail — Temporary Cancellation",
+      description: "Train 12839 (Chennai Mail) is cancelled from April 12th to 18th due to signal upgradation work between Vijayawada and Chennai. Passengers with confirmed tickets will receive full refunds. Alternative: Train 12841.",
+      trainNumber: "12839",
+      trainName: "Chennai Mail",
+    },
   ];
 
-  for (const a of alertData) {
-    const train = trainMap.get(a.trainNo);
-    if (!train) continue;
-    const exists = await prisma.alert.findFirst({
-      where: { userId: a.user.id, trainId: train.id, isActive: true },
+  const allSeededUserIds = [admin.id, ...createdUsers.map((u) => u.id)];
+
+  for (const alertItem of adminAlertData) {
+    await prisma.alert.create({ data: alertItem });
+    await prisma.notification.createMany({
+      data: allSeededUserIds.map((uid) => ({
+        userId: uid,
+        title: `🚨 Alert: ${alertItem.title}`,
+        message: alertItem.description,
+        type: "WARNING",
+      })),
     });
-    if (!exists) {
-      await prisma.alert.create({
-        data: {
-          userId: a.user.id,
-          trainId: train.id,
-          trainNumber: train.trainNumber,
-          trainName: train.title,
-          travelDate: a.date,
-        },
-      });
-    }
   }
-  console.log(`✅ Seeded ${alertData.length} alerts`);
+  console.log(`✅ Seeded ${adminAlertData.length} admin alerts with notifications`);
 
   // ── Notifications ──────────────────────────────────────
   for (const user of createdUsers) {

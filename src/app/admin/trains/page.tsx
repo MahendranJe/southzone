@@ -198,7 +198,7 @@ export default function AdminTrainsPage() {
       return;
     }
     setUploadedImage(dataUrl);
-    notifications.show({ title: "Image uploaded", message: "Train image is ready to save.", color: "green" });
+    notifications.show({ title: "Image uploaded", message: "Time Table is ready to save.", color: "green" });
   };
 
   const buildScheduleBadgeText = () => {
@@ -294,7 +294,7 @@ export default function AdminTrainsPage() {
       <Group justify="space-between">
         <Stack gap={2}>
           <Title order={3}>Train Updates</Title>
-          <Text c="dimmed" size="sm">Manage train schedule updates and uploaded train images</Text>
+          <Text c="dimmed" size="sm">Manage train schedule updates and uploaded Time Tables</Text>
         </Stack>
         <Button
           leftSection={<IconPlus size={16} />}
@@ -500,9 +500,9 @@ export default function AdminTrainsPage() {
             popoverProps={{ withinPortal: false }}
           />
 
-          <Divider label="Train Image" labelPosition="left" />
+          <Divider label="Time Table" labelPosition="left" />
           <FileInput
-            label="Upload Train Image"
+            label="Upload Time Table"
             placeholder="Select image file"
             leftSection={<IconPhoto size={16} />}
             accept="image/*"
@@ -550,7 +550,7 @@ export default function AdminTrainsPage() {
               <Text size="sm" c="dimmed">{viewTrain.description}</Text>
             </Paper>
             <Paper p="md" withBorder radius="md">
-              <Text fw={700} mb="xs">Train Image</Text>
+              <Text fw={700} mb="xs">Time Table</Text>
               {viewTrain.imageUrl ? (
                 <img
                   src={viewTrain.imageUrl}

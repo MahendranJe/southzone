@@ -148,7 +148,7 @@ export default async function TrainDetailsPage({
             </Paper>
 
             <Paper shadow="sm" radius="lg" p="xl" withBorder mt="lg">
-              <Title order={4} mb="md">Train Image</Title>
+              <Title order={4} mb="md">Time Table</Title>
               {train.imageUrl ? (
                 <img
                   src={train.imageUrl}

@@ -23,7 +23,6 @@ model User {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
-  alerts        Alert[]
   notifications Notification[]
   payments      Payment[]
 
@@ -53,27 +52,20 @@ model Train {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  alerts Alert[]
-
   @@index([isActive])
   @@index([trainNumber])
 }
 
 model Alert {
-  id          Int       @id @default(autoincrement())
-  userId      Int
-  trainId     Int
-  trainNumber String
-  trainName   String
-  travelDate  DateTime?
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String   @db.Text
+  trainNumber String?
+  trainName   String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
 
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  train Train @relation(fields: [trainId], references: [id], onDelete: Cascade)
-
-  @@index([userId, isActive])
-  @@index([trainId])
+  @@index([isActive])
 }
 
 model Notification {
