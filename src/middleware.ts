@@ -4,9 +4,13 @@ import { NextResponse } from "next/server";
 
 export default async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  const forwardedProto = req.headers.get("x-forwarded-proto");
+  const isSecureRequest = req.nextUrl.protocol === "https:" || forwardedProto === "https";
+
   const token = await getToken({
     req,
     secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+    secureCookie: isSecureRequest,
   });
 
   // Protected user routes
