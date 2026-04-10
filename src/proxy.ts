@@ -9,6 +9,12 @@ const authConfig: NextAuthConfig = {
   trustHost: true,
   providers: [],
   callbacks: {
+    async session({ session, token }) {
+      if (token && session.user) {
+        session.user.role = token.role as string;
+      }
+      return session;
+    },
     authorized({ auth, request: { nextUrl } }) {
       const { pathname } = nextUrl;
       const isLoggedIn = !!auth?.user;
