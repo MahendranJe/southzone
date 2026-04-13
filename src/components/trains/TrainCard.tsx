@@ -48,6 +48,9 @@ export function TrainCard({ train }: TrainCardProps) {
   const scheduleColor =
     train.scheduleBadgeColor ?? scheduleColorMap[train.scheduleType] ?? "gray";
 
+  // Strip HTML tags for card preview
+  const plainDescription = train.description.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
   return (
     <Card shadow="sm" radius="lg" withBorder className="hover:shadow-lg transition-shadow duration-200 h-full flex flex-col">
       <Stack gap="sm" className="flex-1 p-1 pt-3">
@@ -72,18 +75,18 @@ export function TrainCard({ train }: TrainCardProps) {
         {/* Route */}
         <Group gap="xs" wrap="nowrap">
           <IconMapPin size={14} className="text-gray-400 shrink-0" />
-          <Text size="xs" fw={700} c="dark" lineClamp={1}>
+          <Text size="xs" fw={700} c="red" lineClamp={1}>
             {train.fromStation}
           </Text>
-          <IconArrowRight size={12} className="text-gray-300 shrink-0" />
-          <Text size="xs" fw={700} c="dark" lineClamp={1}>
+          <Text fw={900} c="green" size="sm">→</Text>
+          <Text size="xs" fw={700} c="red" lineClamp={1}>
             {train.toStation}
           </Text>
         </Group>
 
         {/* Description */}
         <Text size="sm" c="dimmed" lineClamp={3} className="flex-1">
-          {train.description}
+          {plainDescription}
         </Text>
 
         {/* Next run + action */}
