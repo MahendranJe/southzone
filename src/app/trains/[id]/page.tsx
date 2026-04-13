@@ -112,7 +112,10 @@ export default async function TrainDetailsPage({
               <Title order={4} mb="md">
                 Update Details
               </Title>
-              <Text>{train.description}</Text>
+              <div
+                style={{ fontSize: 15, lineHeight: 1.7 }}
+                dangerouslySetInnerHTML={{ __html: train.description }}
+              />
               <Text size="xs" c="dimmed" mt="md">
                 Last updated: {dayjs(train.updatedAt).format("DD MMM YYYY, hh:mm A")}
               </Text>

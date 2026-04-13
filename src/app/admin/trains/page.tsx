@@ -19,9 +19,18 @@ import {
   Table,
   Text,
   TextInput,
-  Textarea,
   Title,
 } from "@mantine/core";
+import { RichTextEditor, Link } from "@mantine/tiptap";
+import { useEditor } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import Underline from "@tiptap/extension-underline";
+import TextAlign from "@tiptap/extension-text-align";
+import Superscript from "@tiptap/extension-superscript";
+import SubScript from "@tiptap/extension-subscript";
+import Highlight from "@tiptap/extension-highlight";
+import Color from "@tiptap/extension-color";
+import { TextStyle } from "@tiptap/extension-text-style";
 import { DatePickerInput } from "@mantine/dates";
 import { useDisclosure } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
@@ -130,6 +139,24 @@ export default function AdminTrainsPage() {
   const [viewTrain, setViewTrain] = useState<TrainRecord | null>(null);
   const [viewOpened, viewModal] = useDisclosure(false);
 
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Underline,
+      Link,
+      Superscript,
+      SubScript,
+      Highlight,
+      TextStyle,
+      Color,
+      TextAlign.configure({ types: ["heading", "paragraph"] }),
+    ],
+    content: "",
+    onUpdate: ({ editor }) => {
+      setForm((f) => ({ ...f, description: editor.getHTML() }));
+    },
+  });
+
   const fetchTrains = useCallback(() => {
     setLoading(true);
     fetch("/api/trains?pageSize=50")
@@ -154,6 +181,7 @@ export default function AdminTrainsPage() {
 
   const openCreate = () => {
     resetForm();
+    editor?.commands.setContent("");
     open();
   };
 
@@ -166,6 +194,7 @@ export default function AdminTrainsPage() {
       toStation: train.toStation,
       description: train.description,
     });
+    editor?.commands.setContent(train.description ?? "");
     setScheduleType(train.scheduleType);
     const parsedDays = parseScheduleDays(train.scheduleDays).filter((day) => weekDayValues.includes(day));
     setSelectedDays(parsedDays);
@@ -409,13 +438,40 @@ export default function AdminTrainsPage() {
               onChange={(e) => setForm((f) => ({ ...f, toStation: e.target.value }))}
             />
           </SimpleGrid>
-          <Textarea
-            label="Description"
-            placeholder="Describe the update..."
-            minRows={3}
-            value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-          />
+          <div>
+            <Text size="sm" fw={500} mb={4}>Description</Text>
+            <RichTextEditor editor={editor} style={{ minHeight: 200 }}>
+              <RichTextEditor.Toolbar sticky stickyOffset={0}>
+                <RichTextEditor.ControlsGroup>
+                  <RichTextEditor.Bold />
+                  <RichTextEditor.Italic />
+                  <RichTextEditor.Underline />
+                  <RichTextEditor.Strikethrough />
+                  <RichTextEditor.ClearFormatting />
+                  <RichTextEditor.Highlight />
+                </RichTextEditor.ControlsGroup>
+                <RichTextEditor.ControlsGroup>
+                  <RichTextEditor.H1 />
+                  <RichTextEditor.H2 />
+                  <RichTextEditor.H3 />
+                </RichTextEditor.ControlsGroup>
+                <RichTextEditor.ControlsGroup>
+                  <RichTextEditor.BulletList />
+                  <RichTextEditor.OrderedList />
+                </RichTextEditor.ControlsGroup>
+                <RichTextEditor.ControlsGroup>
+                  <RichTextEditor.AlignLeft />
+                  <RichTextEditor.AlignCenter />
+                  <RichTextEditor.AlignRight />
+                </RichTextEditor.ControlsGroup>
+                <RichTextEditor.ControlsGroup>
+                  <RichTextEditor.Link />
+                  <RichTextEditor.Unlink />
+                </RichTextEditor.ControlsGroup>
+              </RichTextEditor.Toolbar>
+              <RichTextEditor.Content />
+            </RichTextEditor>
+          </div>
           <Select
             label="Schedule Type"
             data={[
@@ -547,7 +603,10 @@ export default function AdminTrainsPage() {
             </SimpleGrid>
             <Paper p="md" withBorder radius="md">
               <Text fw={700} mb="xs">Update Description</Text>
-              <Text size="sm" c="dimmed">{viewTrain.description}</Text>
+              <div
+                style={{ fontSize: 14 }}
+                dangerouslySetInnerHTML={{ __html: viewTrain.description }}
+              />
             </Paper>
             <Paper p="md" withBorder radius="md">
               <Text fw={700} mb="xs">Time Table</Text>
