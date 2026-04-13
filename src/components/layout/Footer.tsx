@@ -122,8 +122,11 @@ export function Footer() {
         </Group>
 
         <Divider my={10} color="rgba(255,255,255,0.2)" />
+        <Text size="sm" fw={600} c="white" ta="center" mb={4}>
+          This website is not affiliated with Indian Railways. Information is for reference only.
+        </Text>
         <Text size="xs" c="rgba(255,255,255,0.6)" ta="center">
-          © {new Date().getFullYear()} Southzone Railway Update · All rights reserved
+          © {new Date().getFullYear()} SouthzoneRailwayUpdate · 
         </Text>
       </Container>
     </Box>
