@@ -13,36 +13,42 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search") ?? "";
+  const role   = searchParams.get("role") ?? "";
+  const plan   = searchParams.get("plan") ?? "";
+  const status = searchParams.get("status") ?? "";
+  const page   = Math.max(1, Number(searchParams.get("page") ?? "1"));
+  const pageSize = Math.min(50, Math.max(1, Number(searchParams.get("pageSize") ?? "10")));
 
-  const users = await prisma.user.findMany({
-    where: search
-      ? {
-          OR: [
-            { fullName: { contains: search } },
-            { email: { contains: search } },
-            { username: { contains: search } },
-          ],
-        }
-      : {},
-    select: {
-      id: true,
-      fullName: true,
-      email: true,
-      username: true,
-      phone: true,
-      gender: true,
-      state: true,
-      city: true,
-      role: true,
-      plan: true,
-      planExpiry: true,
-      isActive: true,
-      createdAt: true,
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const where: Parameters<typeof prisma.user.findMany>[0]["where"] = {
+    ...(search ? {
+      OR: [
+        { fullName: { contains: search, mode: "insensitive" } },
+        { email:    { contains: search, mode: "insensitive" } },
+        { username: { contains: search, mode: "insensitive" } },
+      ],
+    } : {}),
+    ...(role   ? { role } : {}),
+    ...(plan   ? { plan } : {}),
+    ...(status === "active"   ? { isActive: true }  : {}),
+    ...(status === "inactive" ? { isActive: false } : {}),
+  };
 
-  return NextResponse.json({ users });
+  const [total, users] = await Promise.all([
+    prisma.user.count({ where }),
+    prisma.user.findMany({
+      where,
+      select: {
+        id: true, fullName: true, email: true, username: true,
+        phone: true, gender: true, state: true, city: true,
+        role: true, plan: true, planExpiry: true, isActive: true, createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+  ]);
+
+  return NextResponse.json({ users, total, page, pageSize });
 }
 
 export async function PATCH(request: NextRequest) {
