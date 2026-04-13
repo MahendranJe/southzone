@@ -93,6 +93,19 @@ interface TrainForm {
   description: string;
 }
 
+interface ExtractedDocument {
+  train_number: string | null;
+  train_name_tamil: string | null;
+  from_station_tamil: string | null;
+  to_station_tamil: string | null;
+  operating_days_tamil: string | null;
+  stops: Array<{
+    station_name_tamil: string | null;
+    arrival_time: string | null;
+    departure_time: string | null;
+  }>;
+}
+
 const emptyForm: TrainForm = {
   trainNumber: "",
   title: "",
@@ -133,6 +146,9 @@ export default function AdminTrainsPage() {
   const [endDate, setEndDate] = useState<string | null>(null);
   const [runsPerWeek, setRunsPerWeek] = useState<string | null>("2");
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [uploadedImageFile, setUploadedImageFile] = useState<File | null>(null);
+  const [extracting, setExtracting] = useState(false);
+  const [ocrPreview, setOcrPreview] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState<TrainForm>(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -176,6 +192,8 @@ export default function AdminTrainsPage() {
     setEndDate(null);
     setRunsPerWeek("2");
     setUploadedImage(null);
+    setUploadedImageFile(null);
+    setOcrPreview("");
     setEditingId(null);
   };
 
@@ -202,6 +220,8 @@ export default function AdminTrainsPage() {
     setStartDate(train.startDate);
     setEndDate(train.endDate);
     setUploadedImage(train.imageUrl ?? null);
+    setUploadedImageFile(null);
+    setOcrPreview("");
     open();
   };
 
@@ -226,8 +246,101 @@ export default function AdminTrainsPage() {
       notifications.show({ title: "Upload failed", message: "Could not read image file.", color: "red" });
       return;
     }
+    setUploadedImageFile(file);
     setUploadedImage(dataUrl);
     notifications.show({ title: "Image uploaded", message: "Time Table is ready to save.", color: "green" });
+  };
+
+  const buildDescriptionHtml = (result: ExtractedDocument) => {
+    const lines = [
+      result.train_name_tamil ? `ரயில் பெயர்: ${result.train_name_tamil}` : null,
+      result.train_number ? `ரயில் எண்: ${result.train_number}` : null,
+      result.from_station_tamil ? `புறப்படும் நிலையம்: ${result.from_station_tamil}` : null,
+      result.to_station_tamil ? `செல்லும் நிலையம்: ${result.to_station_tamil}` : null,
+      result.operating_days_tamil ? `இயக்கும் நாட்கள்: ${result.operating_days_tamil}` : null,
+    ].filter(Boolean) as string[];
+
+    const stopRows = (result.stops ?? [])
+      .filter((stop) => stop.station_name_tamil)
+      .slice(0, 30)
+      .map((stop) => {
+        const arr = stop.arrival_time ?? "—";
+        const dep = stop.departure_time ?? "—";
+        return `<li>${stop.station_name_tamil} (வருகை: ${arr}, புறப்பு: ${dep})</li>`;
+      });
+
+    if (lines.length === 0 && stopRows.length === 0) {
+      return "<p></p>";
+    }
+
+    const summaryHtml = lines.map((line) => `<p>${line}</p>`).join("");
+    const stopsHtml = stopRows.length
+      ? `<p><strong>நிலைய நேர அட்டவணை:</strong></p><ul>${stopRows.join("")}</ul>`
+      : "";
+
+    return `${summaryHtml}${stopsHtml}`;
+  };
+
+  const handleExtractAndAutofill = async () => {
+    if (!uploadedImageFile) {
+      notifications.show({
+        title: "Upload required",
+        message: "Please upload a timetable image first.",
+        color: "red",
+      });
+      return;
+    }
+
+    try {
+      setExtracting(true);
+
+      const payload = new FormData();
+      payload.append("file", uploadedImageFile);
+      payload.append("ocrLanguage", "eng");
+
+      const res = await fetch("/api/extract", {
+        method: "POST",
+        body: payload,
+      });
+
+      const data = (await res.json()) as {
+        error?: string;
+        result?: ExtractedDocument;
+        ocrText?: string;
+      };
+
+      if (!res.ok || data.error || !data.result) {
+        throw new Error(data.error ?? "Extraction failed");
+      }
+
+      const result = data.result;
+      const nextDescription = buildDescriptionHtml(result);
+
+      setForm((prev) => ({
+        ...prev,
+        trainNumber: result.train_number ?? prev.trainNumber,
+        title: result.train_name_tamil ?? prev.title,
+        fromStation: result.from_station_tamil ?? prev.fromStation,
+        toStation: result.to_station_tamil ?? prev.toStation,
+        description: nextDescription,
+      }));
+      editor?.commands.setContent(nextDescription);
+      setOcrPreview(data.ocrText ?? "");
+
+      notifications.show({
+        title: "Auto-fill complete",
+        message: "Fields were filled using OCR + AI output.",
+        color: "green",
+      });
+    } catch (error) {
+      notifications.show({
+        title: "Extraction error",
+        message: error instanceof Error ? error.message : "Unexpected error",
+        color: "red",
+      });
+    } finally {
+      setExtracting(false);
+    }
   };
 
   const buildScheduleBadgeText = () => {
@@ -564,6 +677,21 @@ export default function AdminTrainsPage() {
             accept="image/*"
             onChange={(file) => readImageFile(file)}
           />
+          <Group justify="space-between" gap="xs">
+            <Text size="xs" c="dimmed">
+              Upload image → OCR → AI cleanup → auto-fill title/train number/description.
+            </Text>
+            <Button
+              variant="light"
+              color="violet"
+              radius="xl"
+              onClick={handleExtractAndAutofill}
+              loading={extracting}
+              disabled={!uploadedImageFile}
+            >
+              AI Extract & Auto-fill
+            </Button>
+          </Group>
           {uploadedImage && (
             <Paper withBorder radius="md" p="sm">
               <Text size="xs" fw={700} mb="xs">Image Preview</Text>
@@ -572,6 +700,14 @@ export default function AdminTrainsPage() {
                 alt="Train upload preview"
                 style={{ width: "100%", maxHeight: 260, objectFit: "cover", borderRadius: 8 }}
               />
+            </Paper>
+          )}
+          {ocrPreview && (
+            <Paper withBorder radius="md" p="sm">
+              <Text size="xs" fw={700} mb="xs">OCR Preview</Text>
+              <Text size="xs" c="dimmed" style={{ whiteSpace: "pre-wrap" }}>
+                {ocrPreview}
+              </Text>
             </Paper>
           )}
 
