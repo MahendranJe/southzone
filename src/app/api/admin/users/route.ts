@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import "@/types/next-auth";
 
 export const runtime = "nodejs";
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
   const page   = Math.max(1, Number(searchParams.get("page") ?? "1"));
   const pageSize = Math.min(50, Math.max(1, Number(searchParams.get("pageSize") ?? "10")));
 
-  const where: Parameters<typeof prisma.user.findMany>[0]["where"] = {
+  const where: Prisma.UserWhereInput = {
     ...(search ? {
       OR: [
         { fullName: { contains: search, mode: "insensitive" } },
