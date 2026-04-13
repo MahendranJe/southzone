@@ -4,6 +4,7 @@ import { ColorSchemeScript, MantineProvider } from "@mantine/core";
 import { Notifications } from "@mantine/notifications";
 import { SessionProvider } from "next-auth/react";
 import { mantineTheme } from "@/theme/mantineTheme";
+import "@mantine/tiptap/styles.css";
 import "./globals.css";
 
 const geistSans = Geist({
