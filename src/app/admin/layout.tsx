@@ -75,7 +75,7 @@ export default function AdminLayout({
             </Button>
             <Button
               component={Link}
-              href="/login"
+              href="/"
               variant="subtle"
               color="white"
               size="xs"
@@ -136,7 +136,7 @@ export default function AdminLayout({
                 </Button>
                 <Button
                   component={Link}
-                  href="/login"
+                  href="/"
                   variant="light"
                   color="red"
                   radius="md"

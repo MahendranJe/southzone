@@ -185,7 +185,7 @@ export function TopNav({ isAdmin = false }: { isAdmin?: boolean }) {
                   <Menu.Item
                     color="red"
                     leftSection={<IconLogout size={14} />}
-                    onClick={() => signOut({ callbackUrl: "/login" })}
+                    onClick={() => signOut({ callbackUrl: "/" })}
                   >
                     Logout
                   </Menu.Item>
@@ -290,7 +290,7 @@ export function TopNav({ isAdmin = false }: { isAdmin?: boolean }) {
                 fullWidth
                 radius="md"
                 leftSection={<IconLogout size={14} />}
-                onClick={() => { signOut({ callbackUrl: "/login" }); close(); }}
+                onClick={() => { signOut({ callbackUrl: "/" }); close(); }}
               >
                 Logout
               </Button>
