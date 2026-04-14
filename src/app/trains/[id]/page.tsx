@@ -156,7 +156,7 @@ export default async function TrainDetailsPage({
                 <img
                   src={train.imageUrl}
                   alt={`${train.title} image`}
-                  style={{ width: "100%", maxHeight: 420, objectFit: "cover", borderRadius: 10 }}
+                  style={{ width: "100%", objectFit: "contain", borderRadius: 10, background: "#f8f9fa", display: "block" }}
                 />
               ) : (
                 <Text size="sm" c="dimmed">No image uploaded for this train yet.</Text>

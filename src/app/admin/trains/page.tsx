@@ -570,7 +570,7 @@ export default function AdminTrainsPage() {
               <img
                 src={uploadedImage}
                 alt="Train upload preview"
-                style={{ width: "100%", maxHeight: 260, objectFit: "cover", borderRadius: 8 }}
+                style={{ width: "100%", maxHeight: 400, objectFit: "contain", borderRadius: 8, background: "#f8f9fa" }}
               />
             </Paper>
           )}
@@ -614,7 +614,7 @@ export default function AdminTrainsPage() {
                 <img
                   src={viewTrain.imageUrl}
                   alt={`${viewTrain.title} image`}
-                  style={{ width: "100%", maxHeight: 320, objectFit: "cover", borderRadius: 8 }}
+                  style={{ width: "100%", maxHeight: 500, objectFit: "contain", borderRadius: 8, background: "#f8f9fa" }}
                 />
               ) : (
                 <Text size="sm" c="dimmed">No image uploaded for this train yet.</Text>
