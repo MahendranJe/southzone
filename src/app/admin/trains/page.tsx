@@ -40,10 +40,12 @@ import {
   IconEye,
   IconPhoto,
   IconPlus,
+  IconScan,
   IconTrash,
   IconTrain,
 } from "@tabler/icons-react";
 import { useCallback, useEffect, useState } from "react";
+import { runOCR, parseTimetable, normalizeTimetableData, type TimetableData, type TimetableDirection, type RouteStop } from "@/lib/ocrExtract";
 
 interface TrainRecord {
   id: number;
@@ -93,12 +95,15 @@ interface TrainForm {
   description: string;
 }
 
-interface ExtractedDocument {
+interface ExtractedDirection {
   train_number: string | null;
   train_name_tamil: string | null;
   from_station_tamil: string | null;
   to_station_tamil: string | null;
   operating_days_tamil: string | null;
+  date_range_tamil: string | null;
+  services_count_tamil: string | null;
+  booking_info_tamil: string | null;
   stops: Array<{
     station_name_tamil: string | null;
     arrival_time: string | null;
@@ -146,6 +151,10 @@ export default function AdminTrainsPage() {
   const [endDate, setEndDate] = useState<string | null>(null);
   const [runsPerWeek, setRunsPerWeek] = useState<string | null>("2");
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [ocrProcessing, setOcrProcessing] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState(0);
+  const [extractedTimetable, setExtractedTimetable] = useState<TimetableData | null>(null);
+  const [ocrRawText, setOcrRawText] = useState<string | null>(null);
   const [uploadedImageFile, setUploadedImageFile] = useState<File | null>(null);
   const [extracting, setExtracting] = useState(false);
   const [ocrPreview, setOcrPreview] = useState<string>("");
@@ -194,6 +203,10 @@ export default function AdminTrainsPage() {
     setUploadedImage(null);
     setUploadedImageFile(null);
     setOcrPreview("");
+    setExtractedTimetable(null);
+    setOcrRawText(null);
+    setOcrProcessing(false);
+    setOcrProgress(0);
     setEditingId(null);
   };
 
@@ -222,6 +235,15 @@ export default function AdminTrainsPage() {
     setUploadedImage(train.imageUrl ?? null);
     setUploadedImageFile(null);
     setOcrPreview("");
+    if (train.timeTableJson) {
+      try {
+        setExtractedTimetable(normalizeTimetableData(JSON.parse(train.timeTableJson)));
+      } catch {
+        setExtractedTimetable(null);
+      }
+    } else {
+      setExtractedTimetable(null);
+    }
     open();
   };
 
@@ -251,34 +273,78 @@ export default function AdminTrainsPage() {
     notifications.show({ title: "Image uploaded", message: "Time Table is ready to save.", color: "green" });
   };
 
-  const buildDescriptionHtml = (result: ExtractedDocument) => {
-    const lines = [
-      result.train_name_tamil ? `ரயில் பெயர்: ${result.train_name_tamil}` : null,
-      result.train_number ? `ரயில் எண்: ${result.train_number}` : null,
-      result.from_station_tamil ? `புறப்படும் நிலையம்: ${result.from_station_tamil}` : null,
-      result.to_station_tamil ? `செல்லும் நிலையம்: ${result.to_station_tamil}` : null,
-      result.operating_days_tamil ? `இயக்கும் நாட்கள்: ${result.operating_days_tamil}` : null,
-    ].filter(Boolean) as string[];
+  const buildDescriptionHtml = (dirs: ExtractedDirection[]) => {
+    const parts: string[] = [];
 
-    const stopRows = (result.stops ?? [])
-      .filter((stop) => stop.station_name_tamil)
-      .slice(0, 30)
-      .map((stop) => {
-        const arr = stop.arrival_time ?? "—";
-        const dep = stop.departure_time ?? "—";
-        return `<li>${stop.station_name_tamil} (வருகை: ${arr}, புறப்பு: ${dep})</li>`;
-      });
+    parts.push(`<p><strong>பயணிகளின் கனிவான கவனத்திற்கு</strong></p>`);
+    parts.push(`<br/>`);
 
-    if (lines.length === 0 && stopRows.length === 0) {
-      return "<p></p>";
+    for (const dir of dirs) {
+      // Train number + route + operating days
+      const routeText = [dir.from_station_tamil, dir.to_station_tamil].filter(Boolean).join(" - ");
+      const daysText = dir.operating_days_tamil ? ` (${dir.operating_days_tamil})` : "";
+      if (dir.train_number || routeText) {
+        parts.push(`<p><strong>ரயில் எண் ${dir.train_number ?? ""}: ${routeText}${daysText}</strong></p>`);
+      }
+
+      // Date range + service count
+      if (dir.date_range_tamil || dir.services_count_tamil) {
+        const dateStr = dir.date_range_tamil ?? "";
+        const svcStr = dir.services_count_tamil ? ` (${dir.services_count_tamil})` : "";
+        parts.push(`<p>காலம்: ${dateStr}${svcStr}</p>`);
+      }
+
+      parts.push(`<br/>`);
     }
 
-    const summaryHtml = lines.map((line) => `<p>${line}</p>`).join("");
-    const stopsHtml = stopRows.length
-      ? `<p><strong>நிலைய நேர அட்டவணை:</strong></p><ul>${stopRows.join("")}</ul>`
-      : "";
+    // Booking info from first direction that has it
+    const bookingInfo = dirs.find((d) => d.booking_info_tamil)?.booking_info_tamil;
+    if (bookingInfo) {
+      parts.push(`<p>${bookingInfo}</p>`);
+    }
 
-    return `${summaryHtml}${stopsHtml}`;
+    return parts.join("") || "<p></p>";
+  };
+
+  const buildLocalDescriptionHtml = (timetable: TimetableData) => {
+    const descParts: string[] = [];
+    for (const dir of timetable.directions) {
+      const route = [dir.from, dir.to].filter(Boolean).join(" → ");
+      const header = [dir.trainNumber, route].filter(Boolean).join(" : ");
+      if (header) descParts.push(`<p><strong>${header}</strong></p>`);
+      if (dir.operatingDays.length > 0) {
+        descParts.push(`<p>Days: ${dir.operatingDays.join(", ")}</p>`);
+      }
+      if (dir.departureTime) {
+        descParts.push(
+          `<p>Departure: ${dir.departureTime} | Arrival: ${dir.arrivalTime ?? "--"}</p>`
+        );
+      }
+    }
+    return descParts.join("");
+  };
+
+  const applyLocalTimetable = (timetable: TimetableData) => {
+    setExtractedTimetable(timetable);
+    const first = timetable.directions[0];
+
+    setForm((f) => ({
+      ...f,
+      trainNumber: first?.trainNumber ?? f.trainNumber,
+      fromStation: first?.from ?? f.fromStation,
+      toStation: first?.to ?? f.toStation,
+    }));
+
+    const descHtml = buildLocalDescriptionHtml(timetable);
+    if (descHtml) {
+      setForm((f) => ({
+        ...f,
+        description: f.description || descHtml,
+      }));
+      if (!form.description) {
+        editor?.commands.setContent(descHtml);
+      }
+    }
   };
 
   const handleExtractAndAutofill = async () => {
@@ -291,55 +357,207 @@ export default function AdminTrainsPage() {
       return;
     }
 
+    let ocrTextForAi = ocrRawText?.trim() ?? "";
+
     try {
       setExtracting(true);
+      if (!ocrTextForAi && uploadedImage) {
+        setOcrProcessing(true);
+        setOcrProgress(0);
+        ocrTextForAi = await runOCR(uploadedImage, setOcrProgress);
+        setOcrRawText(ocrTextForAi);
+      }
 
       const payload = new FormData();
       payload.append("file", uploadedImageFile);
       payload.append("ocrLanguage", "eng");
+      if (ocrTextForAi) {
+        payload.append("ocrText", ocrTextForAi);
+      }
 
-      const res = await fetch("/api/extract", {
-        method: "POST",
-        body: payload,
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 180000);
+
+      let res: Response;
+      try {
+        res = await fetch("/api/extract", {
+          method: "POST",
+          body: payload,
+          signal: controller.signal,
+        });
+      } catch (fetchErr) {
+        clearTimeout(timeoutId);
+        if (fetchErr instanceof DOMException && fetchErr.name === "AbortError") {
+          throw new Error(
+            "AI Extract timed out after 180 seconds. Restart the dev server after updating .env.local, then try again. If it still times out, the OCR step is taking too long for this image."
+          );
+        }
+        throw fetchErr;
+      }
+      clearTimeout(timeoutId);
 
       const data = (await res.json()) as {
         error?: string;
-        result?: ExtractedDocument;
+        directions?: ExtractedDirection[];
         ocrText?: string;
       };
 
-      if (!res.ok || data.error || !data.result) {
-        throw new Error(data.error ?? "Extraction failed");
+      if (!res.ok || data.error || !data.directions?.length) {
+        throw new Error(
+          data.error ??
+            "Extraction failed — check GEMINI_API_KEY or OPENAI_API_KEY in .env.local, then restart the dev server."
+        );
       }
 
-      const result = data.result;
-      const nextDescription = buildDescriptionHtml(result);
+      const dirs = data.directions;
+      const first = dirs[0];
+      const nextDescription = buildDescriptionHtml(dirs);
 
       setForm((prev) => ({
         ...prev,
-        trainNumber: result.train_number ?? prev.trainNumber,
-        title: result.train_name_tamil ?? prev.title,
-        fromStation: result.from_station_tamil ?? prev.fromStation,
-        toStation: result.to_station_tamil ?? prev.toStation,
+        trainNumber: first.train_number ?? prev.trainNumber,
+        title: first.train_name_tamil ?? prev.title,
+        fromStation: first.from_station_tamil ?? prev.fromStation,
+        toStation: first.to_station_tamil ?? prev.toStation,
         description: nextDescription,
       }));
       editor?.commands.setContent(nextDescription);
       setOcrPreview(data.ocrText ?? "");
 
+      // Build structured timetable data from AI result
+      const timetable: TimetableData = {
+        directions: dirs.map((dir) => ({
+          trainNumber: dir.train_number,
+          trainName: dir.train_name_tamil,
+          from: dir.from_station_tamil,
+          to: dir.to_station_tamil,
+          departureTime: dir.stops?.[0]?.departure_time ?? null,
+          arrivalTime: dir.stops?.[dir.stops.length - 1]?.arrival_time ?? null,
+          route: (dir.stops ?? []).map((s) => ({
+            station: s.station_name_tamil ?? "",
+            arrival: s.arrival_time ?? "--",
+            departure: s.departure_time ?? "--",
+          })),
+          operatingDays: [],
+          notes: dir.operating_days_tamil ?? "",
+        })),
+      };
+      setExtractedTimetable(timetable);
+
       notifications.show({
         title: "Auto-fill complete",
-        message: "Fields were filled using OCR + AI output.",
+        message: `Extracted ${dirs.length} direction(s) using OCR + AI.`,
         color: "green",
       });
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Unexpected error";
+
+      if (ocrTextForAi && /quota exceeded|resource_exhausted|billing|Gemini API request failed|OpenAI request failed/i.test(message)) {
+        const fallbackTimetable = parseTimetable(ocrTextForAi);
+        applyLocalTimetable(fallbackTimetable);
+        setOcrPreview(ocrTextForAi);
+
+        notifications.show({
+          title: "AI unavailable — local fallback used",
+          message: "Gemini quota is unavailable, so basic train details were filled using local OCR. Tamil translation and rich auto-description require a working AI provider.",
+          color: "yellow",
+        });
+        return;
+      }
+
       notifications.show({
         title: "Extraction error",
-        message: error instanceof Error ? error.message : "Unexpected error",
+        message,
         color: "red",
       });
     } finally {
+      setOcrProcessing(false);
       setExtracting(false);
+    }
+  };
+
+  const handleLocalOCR = async () => {
+    if (!uploadedImage) {
+      notifications.show({ title: "No image", message: "Upload an image first.", color: "red" });
+      return;
+    }
+    setOcrProcessing(true);
+    setOcrProgress(0);
+    try {
+      const text = await runOCR(uploadedImage, setOcrProgress);
+      setOcrRawText(text);
+      const timetable = parseTimetable(text);
+      applyLocalTimetable(timetable);
+
+      const totalStops = timetable.directions.reduce((sum, d) => sum + d.route.length, 0);
+      notifications.show({ title: "OCR Complete", message: `Extracted ${timetable.directions.length} direction(s), ${totalStops} total stops. Use AI Extract for Tamil.`, color: "green" });
+    } catch (err) {
+      notifications.show({ title: "OCR Error", message: err instanceof Error ? err.message : "Failed", color: "red" });
+    } finally {
+      setOcrProcessing(false);
+    }
+  };
+
+  const handleRemoveRouteStop = (dirIndex: number, stopIndex: number) => {
+    if (!extractedTimetable) return;
+    const newDirs = [...extractedTimetable.directions];
+    newDirs[dirIndex] = {
+      ...newDirs[dirIndex],
+      route: newDirs[dirIndex].route.filter((_, i) => i !== stopIndex),
+    };
+    setExtractedTimetable({ directions: newDirs });
+  };
+
+  const handleUpdateRouteStop = (dirIndex: number, stopIndex: number, field: keyof RouteStop, value: string) => {
+    if (!extractedTimetable) return;
+    const newDirs = [...extractedTimetable.directions];
+    const newRoute = [...newDirs[dirIndex].route];
+    newRoute[stopIndex] = { ...newRoute[stopIndex], [field]: value };
+    newDirs[dirIndex] = { ...newDirs[dirIndex], route: newRoute };
+    setExtractedTimetable({ directions: newDirs });
+  };
+
+  const handleAddRouteStop = (dirIndex: number) => {
+    if (!extractedTimetable) {
+      setExtractedTimetable({
+        directions: [{
+          trainNumber: form.trainNumber || null,
+          trainName: form.title || null,
+          from: form.fromStation || null,
+          to: form.toStation || null,
+          departureTime: null,
+          arrivalTime: null,
+          route: [{ station: "", arrival: "--", departure: "--" }],
+          operatingDays: [],
+          notes: "",
+        }],
+      });
+      return;
+    }
+    const newDirs = [...extractedTimetable.directions];
+    newDirs[dirIndex] = {
+      ...newDirs[dirIndex],
+      route: [...newDirs[dirIndex].route, { station: "", arrival: "--", departure: "--" }],
+    };
+    setExtractedTimetable({ directions: newDirs });
+  };
+
+  const handleAddDirection = () => {
+    const newDir: TimetableDirection = {
+      trainNumber: null,
+      trainName: null,
+      from: null,
+      to: null,
+      departureTime: null,
+      arrivalTime: null,
+      route: [{ station: "", arrival: "--", departure: "--" }],
+      operatingDays: [],
+      notes: "",
+    };
+    if (!extractedTimetable) {
+      setExtractedTimetable({ directions: [newDir] });
+    } else {
+      setExtractedTimetable({ directions: [...extractedTimetable.directions, newDir] });
     }
   };
 
@@ -402,6 +620,7 @@ export default function AdminTrainsPage() {
       endDate: scheduleType === "DateRange" ? endDate ?? undefined : undefined,
       nextRunDate: runningDate ? formatDate(runningDate) : undefined,
       imageUrl: uploadedImage ?? undefined,
+      timeTableJson: extractedTimetable ? JSON.stringify(extractedTimetable) : undefined,
       scheduleBadgeText: buildScheduleBadgeText(),
       scheduleBadgeColor: scheduleColors[scheduleType ?? "Daily"] ?? "gray",
     };
@@ -677,20 +896,35 @@ export default function AdminTrainsPage() {
             accept="image/*"
             onChange={(file) => readImageFile(file)}
           />
-          <Group justify="space-between" gap="xs">
-            <Text size="xs" c="dimmed">
-              Upload image → OCR → AI cleanup → auto-fill title/train number/description.
+          <Group justify="space-between" gap="xs" wrap="wrap">
+            <Text size="xs" c="dimmed" style={{ flex: 1 }}>
+              Upload image → extract timetable using AI or local OCR.
             </Text>
-            <Button
-              variant="light"
-              color="violet"
-              radius="xl"
-              onClick={handleExtractAndAutofill}
-              loading={extracting}
-              disabled={!uploadedImageFile}
-            >
-              AI Extract & Auto-fill
-            </Button>
+            <Group gap="xs">
+              <Button
+                variant="light"
+                color="teal"
+                size="xs"
+                radius="xl"
+                onClick={handleLocalOCR}
+                loading={ocrProcessing}
+                disabled={!uploadedImage}
+                leftSection={<IconScan size={14} />}
+              >
+                {ocrProcessing ? `OCR ${ocrProgress}%` : "Local OCR"}
+              </Button>
+              <Button
+                variant="light"
+                color="violet"
+                size="xs"
+                radius="xl"
+                onClick={handleExtractAndAutofill}
+                loading={extracting}
+                disabled={!uploadedImageFile}
+              >
+                AI Extract & Auto-fill
+              </Button>
+            </Group>
           </Group>
           {uploadedImage && (
             <Paper withBorder radius="md" p="sm">
@@ -698,17 +932,96 @@ export default function AdminTrainsPage() {
               <img
                 src={uploadedImage}
                 alt="Train upload preview"
-                style={{ width: "100%", maxHeight: 260, objectFit: "cover", borderRadius: 8 }}
+                style={{ width: "100%", maxHeight: 400, objectFit: "contain", borderRadius: 8, background: "#f8f9fa" }}
               />
             </Paper>
           )}
-          {ocrPreview && (
+          {(ocrPreview || ocrRawText) && (
             <Paper withBorder radius="md" p="sm">
-              <Text size="xs" fw={700} mb="xs">OCR Preview</Text>
-              <Text size="xs" c="dimmed" style={{ whiteSpace: "pre-wrap" }}>
-                {ocrPreview}
+              <Text size="xs" fw={700} mb="xs">OCR Raw Text</Text>
+              <Text size="xs" c="dimmed" style={{ whiteSpace: "pre-wrap", maxHeight: 150, overflow: "auto" }}>
+                {ocrPreview || ocrRawText}
               </Text>
             </Paper>
+          )}
+          {extractedTimetable && extractedTimetable.directions.length > 0 && (
+            <Stack gap="sm">
+              {extractedTimetable.directions.map((dir, dirIdx) => (
+                <Paper withBorder radius="md" p="sm" key={dirIdx}>
+                  <Group justify="space-between" mb="xs">
+                    <Group gap="xs">
+                      <Badge size="xs" variant="light" color={dirIdx === 0 ? "blue" : "orange"}>
+                        Direction {dirIdx + 1}{dir.trainNumber ? ` • ${dir.trainNumber}` : ""}
+                      </Badge>
+                      <Text size="xs" c="dimmed">
+                        {dir.from ?? "?"} → {dir.to ?? "?"} ({dir.route.length} stops)
+                      </Text>
+                    </Group>
+                    <Button size="compact-xs" variant="subtle" color="teal" onClick={() => handleAddRouteStop(dirIdx)}>+ Add Stop</Button>
+                  </Group>
+                  <Box style={{ overflowX: "auto" }}>
+                  <Table withTableBorder withColumnBorders fz="xs">
+                    <Table.Thead>
+                      <Table.Tr style={{ background: dirIdx === 0 ? "rgba(102,126,234,0.06)" : "rgba(234,156,102,0.06)" }}>
+                        <Table.Th w={30}>#</Table.Th>
+                        <Table.Th>Station</Table.Th>
+                        <Table.Th w={90}>Arrival</Table.Th>
+                        <Table.Th w={90}>Departure</Table.Th>
+                        <Table.Th w={40}></Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {dir.route.map((stop, i) => (
+                        <Table.Tr key={i}>
+                          <Table.Td>{i + 1}</Table.Td>
+                          <Table.Td>
+                            <TextInput
+                              size="xs"
+                              variant="unstyled"
+                              value={stop.station}
+                              onChange={(e) => handleUpdateRouteStop(dirIdx, i, "station", e.target.value)}
+                              styles={{ input: { padding: 0, minHeight: 22 } }}
+                            />
+                          </Table.Td>
+                          <Table.Td>
+                            <TextInput
+                              size="xs"
+                              variant="unstyled"
+                              value={stop.arrival}
+                              onChange={(e) => handleUpdateRouteStop(dirIdx, i, "arrival", e.target.value)}
+                              styles={{ input: { padding: 0, minHeight: 22 } }}
+                            />
+                          </Table.Td>
+                          <Table.Td>
+                            <TextInput
+                              size="xs"
+                              variant="unstyled"
+                              value={stop.departure}
+                              onChange={(e) => handleUpdateRouteStop(dirIdx, i, "departure", e.target.value)}
+                              styles={{ input: { padding: 0, minHeight: 22 } }}
+                            />
+                          </Table.Td>
+                          <Table.Td>
+                            <ActionIcon size="xs" variant="subtle" color="red" onClick={() => handleRemoveRouteStop(dirIdx, i)}>
+                              <IconTrash size={12} />
+                            </ActionIcon>
+                          </Table.Td>
+                        </Table.Tr>
+                      ))}
+                    </Table.Tbody>
+                  </Table>
+                  </Box>
+                </Paper>
+              ))}
+              <Button size="xs" variant="subtle" color="violet" onClick={handleAddDirection}>
+                + Add Another Direction
+              </Button>
+            </Stack>
+          )}
+          {!extractedTimetable && (
+            <Button size="xs" variant="subtle" color="gray" onClick={() => handleAddRouteStop(0)}>
+              + Add Route Stops Manually
+            </Button>
           )}
 
           <Group justify="flex-end" mt="sm">
@@ -750,12 +1063,55 @@ export default function AdminTrainsPage() {
                 <img
                   src={viewTrain.imageUrl}
                   alt={`${viewTrain.title} image`}
-                  style={{ width: "100%", maxHeight: 320, objectFit: "cover", borderRadius: 8 }}
+                  style={{ width: "100%", maxHeight: 500, objectFit: "contain", borderRadius: 8, background: "#f8f9fa" }}
                 />
               ) : (
                 <Text size="sm" c="dimmed">No image uploaded for this train yet.</Text>
               )}
             </Paper>
+            {(() => {
+              let timetable: TimetableData | null = null;
+              if (viewTrain.timeTableJson) {
+                try { timetable = normalizeTimetableData(JSON.parse(viewTrain.timeTableJson)); } catch { /* ignore */ }
+              }
+              if (!timetable || timetable.directions.length === 0) return null;
+              return timetable.directions.map((dir: TimetableDirection, dirIdx: number) => {
+                if (dir.route.length === 0) return null;
+                return (
+                  <Paper p="md" withBorder radius="md" key={dirIdx}>
+                    <Group gap="xs" mb="xs">
+                      <Badge size="sm" variant="light" color={dirIdx === 0 ? "blue" : "orange"}>
+                        Direction {dirIdx + 1}{dir.trainNumber ? ` • ${dir.trainNumber}` : ""}
+                      </Badge>
+                      <Text size="xs" c="dimmed">{dir.from ?? "?"} → {dir.to ?? "?"}</Text>
+                    </Group>
+                    {dir.notes && <Text size="xs" c="dimmed" mb="xs">{dir.notes}</Text>}
+                    <Box style={{ overflowX: "auto" }}>
+                    <Table withTableBorder withColumnBorders fz="sm">
+                      <Table.Thead>
+                        <Table.Tr style={{ background: dirIdx === 0 ? "rgba(102,126,234,0.06)" : "rgba(234,156,102,0.06)" }}>
+                          <Table.Th w={40}>#</Table.Th>
+                          <Table.Th>Station</Table.Th>
+                          <Table.Th w={100}>Arrival</Table.Th>
+                          <Table.Th w={100}>Departure</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {dir.route.map((stop: RouteStop, i: number) => (
+                          <Table.Tr key={i}>
+                            <Table.Td>{i + 1}</Table.Td>
+                            <Table.Td fw={500}>{stop.station}</Table.Td>
+                            <Table.Td>{stop.arrival}</Table.Td>
+                            <Table.Td>{stop.departure}</Table.Td>
+                          </Table.Tr>
+                        ))}
+                      </Table.Tbody>
+                    </Table>
+                    </Box>
+                  </Paper>
+                );
+              });
+            })()}
           </Stack>
         )}
       </Modal>

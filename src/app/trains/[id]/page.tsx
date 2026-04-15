@@ -10,6 +10,7 @@ import {
   ListItem,
   Paper,
   Stack,
+  Table,
   Text,
   ThemeIcon,
   Title,
@@ -156,12 +157,73 @@ export default async function TrainDetailsPage({
                 <img
                   src={train.imageUrl}
                   alt={`${train.title} image`}
-                  style={{ width: "100%", maxHeight: 420, objectFit: "cover", borderRadius: 10 }}
+                  style={{ width: "100%", objectFit: "contain", borderRadius: 10, background: "#f8f9fa", display: "block" }}
                 />
               ) : (
                 <Text size="sm" c="dimmed">No image uploaded for this train yet.</Text>
               )}
             </Paper>
+
+            {(() => {
+              type TDir = { trainNumber?: string | null; from?: string | null; to?: string | null; route?: { station: string; arrival: string; departure: string }[]; notes?: string };
+              type TData = { directions?: TDir[]; route?: { station: string; arrival: string; departure: string }[]; notes?: string };
+              let data: TData | null = null;
+              if (train.timeTableJson) {
+                try { data = JSON.parse(train.timeTableJson); } catch { /* ignore */ }
+              }
+              if (!data) return null;
+
+              // Normalize: old format (flat route) or new format (directions array)
+              const directions: TDir[] = data.directions?.length
+                ? data.directions
+                : data.route?.length
+                  ? [{ route: data.route, notes: data.notes }]
+                  : [];
+
+              if (directions.length === 0) return null;
+
+              return directions.map((dir, dirIdx) => {
+                if (!dir.route?.length) return null;
+                return (
+                  <Paper shadow="sm" radius="lg" p="xl" withBorder mt="lg" key={dirIdx}>
+                    <Group gap="xs" mb="md" wrap="wrap">
+                      <Title order={4}>Route Schedule</Title>
+                      {directions.length > 1 && (
+                        <Badge size="sm" variant="light" color={dirIdx === 0 ? "blue" : "orange"}>
+                          Direction {dirIdx + 1}{dir.trainNumber ? ` • ${dir.trainNumber}` : ""}
+                        </Badge>
+                      )}
+                      {dir.from && dir.to && (
+                        <Text size="sm" c="dimmed">{dir.from} → {dir.to}</Text>
+                      )}
+                    </Group>
+                    {dir.notes && <Text size="sm" c="dimmed" mb="sm">{dir.notes}</Text>}
+                    <Box style={{ overflowX: "auto" }}>
+                    <Table withTableBorder withColumnBorders>
+                      <Table.Thead>
+                        <Table.Tr style={{ background: dirIdx === 0 ? "rgba(102,126,234,0.06)" : "rgba(234,156,102,0.06)" }}>
+                          <Table.Th w={50}>#</Table.Th>
+                          <Table.Th>Station</Table.Th>
+                          <Table.Th w={110}>Arrival</Table.Th>
+                          <Table.Th w={110}>Departure</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {dir.route.map((stop, i) => (
+                          <Table.Tr key={i}>
+                            <Table.Td>{i + 1}</Table.Td>
+                            <Table.Td fw={500}>{stop.station}</Table.Td>
+                            <Table.Td>{stop.arrival}</Table.Td>
+                            <Table.Td>{stop.departure}</Table.Td>
+                          </Table.Tr>
+                        ))}
+                      </Table.Tbody>
+                    </Table>
+                    </Box>
+                  </Paper>
+                );
+              });
+            })()}
           </GridCol>
 
           {/* Sidebar */}
